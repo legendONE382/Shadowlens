@@ -1,4 +1,4 @@
-# ShadowLens (Vercel-ready Next.js app)
+# ShadowLens (Next.js app)
 
 ShadowLens is a production-style web app for discovering shadow AI usage, scoring tool risk, and exporting governance reports.
 
@@ -6,7 +6,6 @@ ShadowLens is a production-style web app for discovering shadow AI usage, scorin
 
 - Next.js App Router (React + TypeScript)
 - API routes for dashboard data and CSV reporting
-- Vercel-ready deployment (`next build` / `next start`)
 
 ## Features implemented
 
@@ -24,16 +23,6 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
-
-## Deploy to Vercel
-
-1. Push this repo to GitHub.
-2. In Vercel, click **Add New → Project**.
-3. Import the repository.
-4. Framework preset should auto-detect as **Next.js**.
-5. Click **Deploy**.
-
-No special environment variables are required for this prototype.
 
 ## API endpoints
 

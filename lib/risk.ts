@@ -10,17 +10,26 @@ type Filters = {
   windowDays?: number;
 };
 
+export function normalizeWindowDays(value?: number): number {
+  if (!value || Number.isNaN(value)) return 30;
+  if (value < 1) return 1;
+  if (value > 365) return 365;
+  return value;
+}
+
 export function applyFilters(events: UsageEvent[], filters: Filters): UsageEvent[] {
+  if (!events.length) return [];
+
   const latest = events.reduce(
     (max, event) => Math.max(max, new Date(event.timestamp).getTime()),
     0
   );
-  const days = filters.windowDays ?? 30;
+  const days = normalizeWindowDays(filters.windowDays);
   const cutoff = latest - days * 24 * 60 * 60 * 1000;
 
   return events.filter((event) => {
     const ts = new Date(event.timestamp).getTime();
-    if (ts < cutoff) return false;
+    if (Number.isNaN(ts) || ts < cutoff) return false;
     if (filters.department && filters.department !== 'all' && event.department !== filters.department) return false;
     if (filters.device && filters.device !== 'all' && event.device !== filters.device) return false;
     if (filters.status && filters.status !== 'all' && event.status !== filters.status) return false;

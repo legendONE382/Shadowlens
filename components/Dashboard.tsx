@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type EventRow = {
   timestamp: string;
@@ -21,6 +21,10 @@ type ToolRow = {
 };
 
 type DashboardResponse = {
+  filterOptions: {
+    departments: string[];
+    devices: string[];
+  };
   stats: {
     totalTools: number;
     totalEvents: number;
@@ -32,6 +36,10 @@ type DashboardResponse = {
 };
 
 const defaultData: DashboardResponse = {
+  filterOptions: {
+    departments: [],
+    devices: []
+  },
   stats: { totalTools: 0, totalEvents: 0, highRiskTools: 0, unapprovedEvents: 0 },
   tools: [],
   events: []
@@ -43,8 +51,11 @@ export default function Dashboard() {
   const [status, setStatus] = useState('all');
   const [windowDays, setWindowDays] = useState(30);
   const [data, setData] = useState<DashboardResponse>(defaultData);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     const params = new URLSearchParams({
       department,
       device,
@@ -52,29 +63,41 @@ export default function Dashboard() {
       windowDays: String(windowDays)
     });
 
-    fetch(`/api/events?${params.toString()}`)
-      .then((res) => res.json())
-      .then((payload: DashboardResponse) => setData(payload));
+    const run = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await fetch(`/api/events?${params.toString()}`, {
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load dashboard data (${response.status})`);
+        }
+
+        const payload: DashboardResponse = await response.json();
+        setData(payload);
+      } catch (err) {
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          setError('Unable to load dashboard data. Please retry.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => controller.abort();
   }, [department, device, status, windowDays]);
 
-  const departments = useMemo(
-    () => [...new Set(data.events.map((e) => e.department))].sort(),
-    [data.events]
-  );
-
-  const devices = useMemo(
-    () => [...new Set(data.events.map((e) => e.device))].sort(),
-    [data.events]
-  );
-
-  const timeline = useMemo(() => {
+  const timeline = (() => {
     const counts = new Map<string, number>();
     for (const event of data.events) {
       const day = event.timestamp.slice(5, 10);
       counts.set(day, (counts.get(day) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [data.events]);
+  })();
 
   const maxTimeline = Math.max(1, ...timeline.map(([, v]) => v));
 
@@ -98,19 +121,21 @@ export default function Dashboard() {
         <button className="button" onClick={downloadReport}>Export Report</button>
       </header>
 
+      {error ? <section className="panel error">{error}</section> : null}
+
       <section className="panel controls">
         <h2>Filters</h2>
         <div className="grid four">
           <label>Department
             <select value={department} onChange={(e) => setDepartment(e.target.value)}>
               <option value="all">All</option>
-              {departments.map((dep) => <option key={dep} value={dep}>{dep}</option>)}
+              {data.filterOptions.departments.map((dep) => <option key={dep} value={dep}>{dep}</option>)}
             </select>
           </label>
           <label>Device
             <select value={device} onChange={(e) => setDevice(e.target.value)}>
               <option value="all">All</option>
-              {devices.map((dev) => <option key={dev} value={dev}>{dev}</option>)}
+              {data.filterOptions.devices.map((dev) => <option key={dev} value={dev}>{dev}</option>)}
             </select>
           </label>
           <label>Approval
@@ -140,6 +165,7 @@ export default function Dashboard() {
 
       <section className="panel">
         <h2>Tool Risk Overview</h2>
+        {isLoading ? <p className="small">Loading…</p> : null}
         <table>
           <thead>
             <tr>
@@ -172,6 +198,7 @@ export default function Dashboard() {
               <strong>{count}</strong>
             </div>
           ))}
+          {!timeline.length && !isLoading ? <p className="small">No events in this view.</p> : null}
         </div>
       </section>
     </main>
